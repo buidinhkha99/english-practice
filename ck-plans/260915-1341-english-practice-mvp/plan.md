@@ -15,6 +15,8 @@ nhập văn bản → phân tích từ/cụm/ngữ pháp → đối chiếu kho 
 | Phạm vi | Solo-first, schema có `user_id` sẵn để mở multi-user sau |
 | Stack | Next.js 16 App Router + React 19 + TS, Postgres (Neon) + Drizzle, deploy Vercel |
 | AI | Groq free tier, sau lớp `LlmProvider` — đổi sang Ollama local hoặc Anthropic bằng config |
+| Lexicon cụm | LLM sinh theo chủ đề → duyệt tay, ~600-800 mục (PRD §7.2.1) |
+| Ngân sách học | Cấu hình được, mặc định 30 phút/ngày; trần item mới suy ra từ đó (PRD §7.4.1) |
 | Mobile | Web trước, API-first; React Native ở Phase 7 |
 | SRS | FSRS-5 qua `ts-fsrs` |
 
@@ -56,11 +58,12 @@ tránh lên kế hoạch giả định quá xa khi chưa có dữ liệu sử d�
 |---|---|
 | 🔴 Rò rỉ tài liệu công ty ra LLM | Phase 1 (redaction, cờ `sensitive`) |
 | 🔴 Bùng nổ item ngữ pháp | Phase 4 (catalog slug đóng) |
-| 🟠 Quá tải hàng đợi → bỏ cuộc | Phase 2 (trần item mới/ngày) |
+| 🟠 Quá tải hàng đợi → bỏ cuộc | Phase 2 (ngân sách 30 phút/ngày + giãn tồn đọng) |
 | 🟠 Groq rate limit | Phase 1 (tầng A độc lập + cache 2 lớp) |
 | 🟡 Logic lẫn vào React → viết lại cho mobile | Mọi phase (review khi merge) |
 
 ## Câu hỏi mở
 
-6 câu hỏi chưa chốt — xem §15 của PRD. Ảnh hưởng sớm nhất: **Q2** (nguồn lexicon cụm công việc,
-cần trước Phase 1) và **Q6** (ngân sách phút/ngày, cần trước Phase 2).
+**Q2** (lexicon) và **Q6** (ngân sách thời gian) đã chốt — xem §7.2.1 và §7.4.1 của PRD.
+Còn 4 câu mở: **Q1** nguồn CEFR (Phase 1) · **Q3** ngưỡng `known` (Phase 2) · **Q4** audio họp (Phase 3)
+· **Q5** bản quyền catalog ngữ pháp (Phase 4).

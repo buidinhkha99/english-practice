@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Phiên bản** | 1.0 |
+| **Phiên bản** | 1.1 |
 | **Ngày** | 2026-09-15 |
-| **Trạng thái** | Draft — chờ review |
+| **Trạng thái** | Draft — Q2 & Q6 đã chốt, 4 câu hỏi còn mở |
 | **Owner** | buidinhkha99 |
 | **Repo** | `buidinhkha99/english-practice` |
 
@@ -178,7 +178,7 @@ tạo ra hàng trăm item và phá vỡ nguyên tắc #2 (thu hẹp).
 | Tokenize + lemma + POS | token → lemma chuẩn hoá (`ran` → `run`) | `wink-nlp` + eng-lite model |
 | Lọc stopword & tên riêng | loại `the`, `and`, tên người/công ty | wink NER + stoplist |
 | Tra tần suất | gán `freq_band` 1-10 từ bảng tần suất tĩnh (top 20k) | dataset tĩnh |
-| Bắt cụm ứng viên | n-gram 2-4 + đối chiếu **lexicon cụm công việc** có sẵn | lexicon tự seed |
+| Bắt cụm ứng viên | n-gram 2-4 + đối chiếu **lexicon cụm công việc** có sẵn | lexicon LLM-seeded, duyệt tay (§7.2.1) |
 
 Tầng A **luôn chạy được** kể cả offline/hết quota → thoả nguyên lý #5.
 
@@ -196,6 +196,21 @@ LLM chỉ nhận **những gì tầng A không quyết được**, với structu
 
 **Ràng buộc chống ảo giác:** B2 bị ép chọn trong tập slug đóng của catalog. Confidence < 0.6 → loại.
 Đây là cơ chế chặn "bùng nổ item ngữ pháp" — xem Rủi ro R2.
+
+#### 7.2.1 Lexicon cụm công việc — quy trình seed *(chốt: LLM sinh, người duyệt)*
+
+Lexicon là dữ liệu tĩnh, seed **một lần** trước Phase 1, không phải thứ chạy lúc runtime.
+
+| Bước | Việc | Ghi chú |
+|---|---|---|
+| 1 | LLM sinh theo **chủ đề công việc** (họp, review code, planning, escalation, deadline, feedback, negotiation...), mỗi chủ đề 80-120 mục | Sinh theo lô nhỏ cho dễ duyệt, không sinh 1000 mục một lần |
+| 2 | Mỗi mục kèm: `text_norm`, `kind`, nghĩa EN ngắn, **1 câu ví dụ trong ngữ cảnh công việc**, CEFR ước lượng | Ví dụ là thứ giúp duyệt nhanh — đọc câu là biết mục đó có thật hay bịa |
+| 3 | **Duyệt tay** — loại mục bịa, mục quá hiếm, mục trùng biến thể (`circle back` vs `circle back on`) | Bước không thể bỏ: đây là phòng tuyến chống rủi ro R5 |
+| 4 | Chuẩn hoá về dạng lemma của động từ, gộp biến thể về một `text_norm` | `aligned with` / `aligning with` → `align with` |
+| 5 | Commit `data/business-phrases.json` kèm ghi chú số lượng và ngày sinh | Dữ liệu vào git, review được qua diff |
+
+**Mục tiêu v1:** ~600-800 mục đã duyệt. Đủ phủ phần lớn cụm công việc thường gặp; phần còn lại để tầng B bắt.
+Lexicon mở rộng dần: cụm nào LLM ở tầng B xác nhận nhiều lần mà chưa có trong lexicon → hàng chờ để duyệt bổ sung.
 
 #### Chấm điểm ưu tiên
 
@@ -257,7 +272,7 @@ Với item hệ thống chưa biết trạng thái, cho phép trả lời nhanh 
 | F3.2 | Click item → panel chi tiết: mọi occurrence trong mọi nguồn, nghĩa đầy đủ, ngữ pháp liên quan |
 | F3.3 | Thao tác hàng loạt: chọn tất cả trong khối, bỏ chọn tất cả, đảo chọn |
 | F3.4 | Nút "Bỏ qua vĩnh viễn" (ignore) — không bao giờ đề xuất lại |
-| F3.5 | **Trần item mới/ngày** (mặc định 20) — vượt thì cảnh báo, chống quá tải |
+| F3.5 | **Trần item mới/ngày** — *suy ra từ ngân sách thời gian*, không phải knob độc lập (§7.4.1). Vượt thì cảnh báo |
 | F3.6 | Rời trang giữa chừng → giữ nguyên lựa chọn (draft), quay lại làm tiếp |
 
 ---
@@ -286,11 +301,34 @@ Vì mục tiêu là **hiểu họp** và **diễn đạt chủ động**, thẻ 
 
 Cloze là mặc định vì nó giữ ngữ cảnh thật — đúng nguyên lý #1.
 
+#### 7.4.1 Ngân sách thời gian *(chốt: cấu hình được, mặc định 30 phút/ngày)*
+
+**Người dùng chỉnh một knob duy nhất: số phút/ngày.** Mọi giới hạn khác được *suy ra*, không đặt riêng.
+Hai knob độc lập (phút/ngày và trần item mới/ngày) chắc chắn sẽ mâu thuẫn nhau sau vài tuần.
+
+```
+ngân sách        = 30 phút/ngày                    ← knob duy nhất, mặc định
+thời gian/thẻ    = trung bình động từ bảng `reviews`, khởi tạo 12s
+sức chứa/ngày    = 30 × 60 / 12 ≈ 150 thẻ
+tỷ lệ review:new ≈ 9-10 : 1  (đặc tính FSRS ở trạng thái ổn định)
+→ trần item mới  ≈ 150 / 10 ≈ 15 item/ngày
+```
+
+| ID | Yêu cầu |
+|---|---|
+| F4.8 | Ngân sách phút/ngày trong settings, dải 5-120, mặc định **30** |
+| F4.9 | Trần item mới/ngày **tính từ ngân sách**, hiển thị giá trị suy ra cho người dùng thấy |
+| F4.10 | `thời gian/thẻ` dùng trung bình động thật của người dùng sau khi có ≥ 100 review; trước đó dùng 12s |
+| F4.11 | Chạm ngân sách giữa phiên → đề nghị dừng, **không chặn cứng** nếu người dùng muốn học tiếp |
+| F4.12 | Hàng đợi tồn đọng (nghỉ vài ngày) → giãn ra nhiều ngày theo ngân sách, không dồn hết vào một hôm |
+
+Cơ chế F4.12 là thứ quyết định người dùng có quay lại sau kỳ nghỉ hay không — mở app thấy 400 thẻ là bỏ luôn.
+
 | ID | Yêu cầu |
 |---|---|
 | F4.1 | Phiên ôn: kích thước hàng đợi hiển thị rõ, có thể dừng giữa chừng không mất tiến độ |
 | F4.2 | Chấm 4 mức FSRS: `Again` / `Hard` / `Good` / `Easy`, phím tắt `1-4` và `Space` |
-| F4.3 | Trộn item đến hạn + item mới theo tỷ lệ config (mặc định 80/20) |
+| F4.3 | Trộn item đến hạn + item mới theo tỷ lệ config (mặc định 80/20), tổng không vượt ngân sách §7.4.1 |
 | F4.4 | Thẻ luôn hiển thị **nguồn gốc**: "từ *Sprint planning 12/09*" — click về nguồn |
 | F4.5 | Nút sửa/gắn cờ item ngay trong lúc ôn (nghĩa sai, ví dụ tệ) |
 | F4.6 | Phiên ôn hoạt động offline sau khi tải hàng đợi; đồng bộ lại khi có mạng |
@@ -645,6 +683,8 @@ Phase 3-4 làm app thực sự tốt. Phase 5-7 là mở rộng.
 
 Kế hoạch chi tiết từng phase: [`ck-plans/260915-1341-english-practice-mvp/plan.md`](../ck-plans/260915-1341-english-practice-mvp/plan.md)
 
+Tài liệu thiết kế: [`design-brief.md`](design-brief.md) (brief cho UI/UX) · [`design-screens.md`](design-screens.md) (đặc tả từng màn)
+
 ---
 
 ## 14. Rủi ro
@@ -653,7 +693,7 @@ Kế hoạch chi tiết từng phase: [`ck-plans/260915-1341-english-practice-mv
 |---|---|---|---|
 | **R1** | **Rò rỉ tài liệu công ty ra LLM bên thứ ba** | 🔴 Cao | Redaction bắt buộc (S1), cờ `sensitive` (S3), đường local provider. Xem §11 |
 | **R2** | Bùng nổ item ngữ pháp — LLM sinh pattern tự do, SRS thành rác | 🔴 Cao | Catalog slug đóng (§7.7), ngưỡng confidence, LLM chỉ phân loại không sáng tạo |
-| **R3** | Quá tải item — nhập nhiều nguồn, hàng đợi phình, bỏ cuộc | 🟠 TB | Trần item mới/ngày (F3.5), priority score, mặc định **không** tick sẵn |
+| **R3** | Quá tải item — nhập nhiều nguồn, hàng đợi phình, bỏ cuộc | 🟠 TB | Ngân sách phút/ngày suy ra trần item mới (§7.4.1), giãn tồn đọng (F4.12), priority score, mặc định **không** tick sẵn |
 | **R4** | Groq rate limit chặn luồng chính | 🟠 TB | Tầng A độc lập, cache 2 lớp, hàng đợi + backoff, cờ `degraded` (§10) |
 | **R5** | Chất lượng trích cụm kém → item vô giá trị, mất niềm tin | 🟠 TB | Lexicon cụm công việc seed sẵn, nút gắn cờ (F4.5), theo dõi tỷ lệ flag < 5% |
 | **R6** | Dự án cá nhân chết yểu sau 2 tuần | 🟠 TB | MVP cắt xuống Phase 0-2; thời gian tới bản dùng được thật phải tính bằng tuần, không phải tháng |
@@ -667,11 +707,11 @@ Kế hoạch chi tiết từng phase: [`ck-plans/260915-1341-english-practice-mv
 | # | Câu hỏi | Ảnh hưởng | Cần chốt trước |
 |---|---|---|---|
 | Q1 | Nguồn dữ liệu CEFR cho từ vựng? Các list chính thống (Oxford/Cambridge) có bản quyền. Dùng xấp xỉ từ freq_band? | Độ chính xác `level_fit` khi chấm priority | Phase 1 |
-| Q2 | Lexicon cụm công việc seed từ đâu — tự soạn ~500-1000 mục, hay sinh bằng LLM rồi tự duyệt? | Chất lượng trích cụm (R5) | Phase 1 |
+| ~~Q2~~ | ✅ **Đã chốt** — LLM sinh theo chủ đề, người duyệt tay. Quy trình ở §7.2.1, mục tiêu ~600-800 mục | — | — |
 | Q3 | Ngưỡng `known`: 60 ngày + 3 lần đúng có hợp lý không, hay để tự tinh chỉnh sau khi có dữ liệu thật? | Coverage score, kích thước hàng đợi | Phase 2 |
 | Q4 | Có cần lưu audio gốc cuộc họp để làm thẻ nghe bằng giọng thật thay vì TTS? | Chất lượng luyện nghe, độ phức tạp lưu trữ | Phase 3 |
 | Q5 | Catalog ngữ pháp tự soạn hay lấy từ nguồn mở nào? Cần kiểm tra bản quyền | Phase 4 khởi động được hay không | Phase 4 |
-| Q6 | Bao nhiêu phút/ngày là ngân sách thực tế? Quyết định trần item mới và kích thước hàng đợi mặc định | Thiết kế hàng đợi, chống burnout (R3) | Phase 2 |
+| ~~Q6~~ | ✅ **Đã chốt** — cấu hình được, mặc định **30 phút/ngày**; trần item mới suy ra từ đó. Công thức ở §7.4.1 | — | — |
 
 ---
 

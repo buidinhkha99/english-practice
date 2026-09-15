@@ -16,15 +16,19 @@
 - **SRS engine phải là hàm thuần**, không chạm DB. Nhận `(state, rating)` trả `state mới`.
   Cần thiết để test được và để đổi thuật toán sau này mà không đụng tầng dữ liệu.
 - `fsrs_state` lưu jsonb — FSRS còn tiến hoá, tránh migrate cột mỗi lần đổi version.
-- Câu hỏi mở **Q6** (ngân sách phút/ngày) phải chốt trước khi đặt mặc định kích thước hàng đợi,
-  nếu không sẽ thiết kế hàng đợi theo cảm tính và dẫn tới rủi ro R3 (burnout).
+- **Ngân sách thời gian là knob duy nhất** (mặc định 30 phút/ngày, PRD §7.4.1). Trần item mới/ngày
+  được *suy ra* từ nó, không phải cài đặt riêng — hai knob độc lập chắc chắn mâu thuẫn sau vài tuần.
+- **Giãn hàng đợi tồn đọng** (F4.12) quyết định người dùng có quay lại sau kỳ nghỉ hay không.
+  Mở app thấy 400 thẻ dồn một ngày là bỏ luôn.
 
 ## Requirements
 **Functional**
 - Chuyển trạng thái `new` → `learning` → `review` → `known` (+ `suspended`, `ignored`)
 - FSRS-5 qua `ts-fsrs`, 4 mức chấm `Again` / `Hard` / `Good` / `Easy`
 - Thẻ cloze từ câu gốc (mặc định) + thẻ nhận diện + thẻ sản sinh
-- Trộn item đến hạn và item mới theo tỷ lệ config (mặc định 80/20)
+- Ngân sách phút/ngày trong settings (dải 5-120, mặc định 30); trần item mới suy ra và hiển thị
+- Trộn item đến hạn và item mới theo tỷ lệ config (mặc định 80/20), tổng không vượt ngân sách
+- Tồn đọng giãn ra nhiều ngày thay vì dồn một hôm; chạm ngân sách thì đề nghị dừng, không chặn cứng
 - Mỗi thẻ hiển thị nguồn gốc, click về được nguồn
 - Gắn cờ item sai ngay trong lúc ôn
 - Dừng phiên giữa chừng không mất tiến độ
@@ -75,7 +79,8 @@ lib/stats/        số liệu dashboard
 - [ ] Schema `user_items` FSRS + bảng `reviews`
 - [ ] `lib/srs/scheduler.ts` hàm thuần + unit test
 - [ ] Chuyển trạng thái + ngưỡng `known` (chốt Q3)
-- [ ] Dựng hàng đợi + tỷ lệ trộn + trần/ngày (chốt Q6)
+- [ ] Ngân sách phút/ngày + công thức suy ra trần item mới
+- [ ] Dựng hàng đợi + tỷ lệ trộn + giãn tồn đọng
 - [ ] Sinh thẻ cloze từ occurrence bằng offset
 - [ ] Thẻ nhận diện + sản sinh
 - [ ] UI phiên ôn + phím tắt + gắn cờ
@@ -96,7 +101,7 @@ lib/stats/        số liệu dashboard
 ## Risk Assessment
 | Rủi ro | Mức | Giảm thiểu |
 |---|---|---|
-| Quá tải hàng đợi → bỏ cuộc (R3) | 🟠 | Trần item mới/ngày, chốt Q6 trước khi đặt mặc định |
+| Quá tải hàng đợi → bỏ cuộc (R3) | 🟠 | Ngân sách 30 phút/ngày suy ra trần item mới; giãn tồn đọng |
 | Cloze khoét sai vị trí do offset lệch | 🟠 | Test bất biến từ Phase 1; fallback sang thẻ nhận diện nếu offset không khớp |
 | Đồng bộ offline gây ghi trùng rating | 🟠 | Idempotency key trên mỗi review; ghi trùng thì bỏ qua |
 | Ngưỡng `known` sai → coverage score ảo | 🟡 | Đánh dấu Q3 là giả định, xem lại sau 4-6 tuần dữ liệu thật |
@@ -108,4 +113,5 @@ lib/stats/        số liệu dashboard
 
 ## Next Steps
 MVP hoàn tất. Dùng thật ít nhất 2-4 tuần trước khi sang Phase 3 — dữ liệu sử dụng thật sẽ trả lời
-Q1/Q3/Q6 và điều chỉnh trọng số priority chính xác hơn mọi phỏng đoán lúc này.
+Q1/Q3 và điều chỉnh trọng số priority chính xác hơn mọi phỏng đoán lúc này. `thời gian/thẻ` thật
+sẽ thay hằng số 12s, làm trần item mới sát với người dùng hơn.

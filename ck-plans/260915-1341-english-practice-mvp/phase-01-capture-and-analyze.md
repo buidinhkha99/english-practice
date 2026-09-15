@@ -29,7 +29,7 @@
 - Phân tích streaming có progress; kết quả nhóm 4 khối (Mới / Đang học / Đã thuộc / Bỏ qua)
 - Hai chế độ triage: tự động đề xuất N item, hoặc liệt kê toàn bộ
 - Quét tự đánh giá 3 mức: Đã biết / Không chắc / Chưa biết
-- Trần item mới/ngày (mặc định 20)
+- Trần item mới/ngày suy ra từ ngân sách 30 phút/ngày (PRD §7.4.1) — mặc định ~15
 - Chống trùng nguồn bằng `content_hash`
 
 **Non-functional**
@@ -71,7 +71,8 @@ app/triage/[id]/  màn Triage
 1. Mở rộng schema Drizzle theo §8 PRD; migration
 2. `lib/nlp/` với wink-nlp: tách câu giữ offset, lemma + POS, lọc stopword/tên riêng
 3. Dataset tần suất tĩnh (top 20k) → `freq_band` 1-10
-4. Seed `data/business-phrases.json` — lexicon cụm công việc (xem câu hỏi mở Q2)
+4. Seed `data/business-phrases.json` — LLM sinh theo chủ đề công việc → **duyệt tay** → chuẩn hoá lemma
+   → commit. Mục tiêu ~600-800 mục. Quy trình đầy đủ ở PRD §7.2.1
 5. Bắt cụm ứng viên: n-gram 2-4 + đối chiếu lexicon + phrasal verb detection
 6. Seed `grammar_patterns` (~150-200 slug, CEFR A2-C1) — nghiêng về register công việc
 7. `lib/redact/`: email, phone, URL nội bộ, token/key, tên người qua wink NER → placeholder
@@ -89,7 +90,7 @@ app/triage/[id]/  màn Triage
 - [ ] Schema mở rộng + migration
 - [ ] `lib/nlp/` tách câu + lemma + POS + offset chính xác
 - [ ] Dataset tần suất + `freq_band`
-- [ ] Lexicon cụm công việc (Q2 — chốt nguồn trước)
+- [ ] Lexicon cụm công việc: sinh theo lô chủ đề, duyệt tay từng lô, ~600-800 mục đã duyệt
 - [ ] Seed grammar catalog ~150-200 pattern
 - [ ] `lib/redact/` + preview UI
 - [ ] `LlmProvider` interface + Groq + mock
